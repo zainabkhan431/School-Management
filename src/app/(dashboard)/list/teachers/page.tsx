@@ -99,29 +99,48 @@ const renderRow = (item: TeacherList) => (
 
 
 );
-const TeacherListPage = async({searchParams,}:
-   {searchParams:  {
-    [key:string]: string
-    | undefined} 
-     
+const TeacherListPage = async ({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | undefined };
 }) => {
-  const {page, ...queryParams}=searchParams;
-  const p= page? parseInt(page):1;
-
-  const [data,count] = await prisma.$transaction([
-
+  const { page, ...queryParams } = searchParams;
+  const p = page ? parseInt(page) : 1;
   
-   prisma.teacher.findMany({
-    include: {
-      subjects: { select: { name: true } }, 
-      classes: { select: { name: true } },
-    },
-    take:ITEM_PER_PAGE,
-    skip: ITEM_PER_PAGE *(p-1),
-  }),
-   prisma.teacher.count(),
-]) 
+  // Ensure classId is properly parsed or set to undefined if missing
+  const classId = queryParams.classId ? parseInt(queryParams.classId) : undefined;
 
+  // Fetch teachers and count only those matching the `where` condition
+  const [data, count] = await prisma.$transaction([
+    prisma.teacher.findMany({
+      where: classId
+        ? {
+            lessons: {
+              some: {
+                classId: classId,
+              },
+            },
+          }
+        : undefined, // Avoid passing an empty where object
+      include: {
+        subjects: { select: { name: true } },
+        classes: { select: { name: true } },
+      },
+      take: ITEM_PER_PAGE,
+      skip: ITEM_PER_PAGE * (p - 1),
+    }),
+    prisma.teacher.count({
+      where: classId
+        ? {
+            lessons: {
+              some: {
+                classId: classId,
+              },
+            },
+          }
+        : undefined,
+    }),
+  ]);
 
   return (
     <div className="bg-white p-4 rounded-md flex-1 m-4 mt-0">
@@ -137,19 +156,14 @@ const TeacherListPage = async({searchParams,}:
             <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
               <Image src="/sort.png" alt="" width={14} height={14} />
             </button>
-            {role === "admin" && (
-              // <button className="w-8 h-8 flex items-center justify-center rounded-full bg-lamaYellow">
-              //   <Image src="/plus.png" alt="" width={14} height={14} />
-              // </button>
-              <FormModal table="teacher" type="create"/>
-            )}
+            {role === "admin" && <FormModal table="teacher" type="create" />}
           </div>
         </div>
       </div>
       {/* LIST */}
-      <Table columns={columns} renderRow={renderRow} data={teachersData} />
+      <Table columns={columns} renderRow={renderRow} data={data} />
       {/* PAGINATION */}
-      <Pagination page={p} count={count}/>
+      <Pagination page={p} count={count} />
     </div>
   );
 };
