@@ -1,6 +1,21 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { routeAccessMap } from "./lib/settings";
 
-export default clerkMiddleware();
+const matchers = Object.keys(routeAccessMap).map((route) => ({
+  matcher: createRouteMatcher([route]),
+  allowedRoles: routeAccessMap[route],
+}));
+
+export default clerkMiddleware(async (auth, req) => {
+  const authData = await auth();  
+
+  // Check if user is signed in
+  if (!authData.userId) {
+    return authData.redirectToSignIn();
+  }
+
+  console.log("Session Claims:", authData.sessionClaims);
+});
 
 export const config = {
   matcher: [
